@@ -529,9 +529,10 @@ app.get('/', async (req, res) => {
     
     // Update history index
     await updateHistoryIndex(chatsByProject);
-    
-    // Run analysis automatically
-    const analysisResults = await runAnalysis();
+
+    // Run analysis in background (don't block page load)
+    const analysisResults = { pending: true };
+    runAnalysis().catch(err => console.error('Background analysis error:', err));
     
     // Load enhanced summaries from history index
     try {

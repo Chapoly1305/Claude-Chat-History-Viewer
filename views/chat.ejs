@@ -77,22 +77,14 @@
     </div>
     <script src="/js/chat-search.js"></script>
     <script>
-        // Handle back navigation with context restoration
+        // Handle back navigation - use browser history for instant back
         document.getElementById('back-link').addEventListener('click', function(e) {
             e.preventDefault();
-            const contextStr = sessionStorage.getItem('returnContext');
-            if (contextStr) {
-                try {
-                    const context = JSON.parse(contextStr);
-                    const url = new URL('/', window.location.origin);
-                    if (context.folder) {
-                        url.searchParams.set('folder', context.folder);
-                    }
-                    window.location.href = url.toString();
-                } catch (err) {
-                    window.location.href = '/';
-                }
+            // Use browser's back to leverage bfcache for instant navigation
+            if (window.history.length > 1) {
+                window.history.back();
             } else {
+                // Fallback if no history (direct link)
                 window.location.href = '/';
             }
         });
