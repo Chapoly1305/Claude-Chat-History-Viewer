@@ -8,60 +8,47 @@
     let searchTerm = '';
     let dateRangeStart = null;
     let dateRangeEnd = null;
+    let selectedChatId = null;
+    let chatCache = {};
 
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
     const sidebarOverlay = document.getElementById('sidebar-overlay');
     const chatList = document.getElementById('chat-list');
     const searchInput = document.getElementById('search-input');
-    const breadcrumb = document.getElementById('breadcrumb');
     const visibleCount = document.getElementById('visible-count');
     const emptyState = document.getElementById('empty-state');
 
-    // Navigation context - save before leaving, restore on return
-    function saveNavigationContext() {
-        sessionStorage.setItem('returnContext', JSON.stringify({
-            folder: currentFolder,
-            scrollY: window.scrollY,
-            dateRange: { start: dateRangeStart, end: dateRangeEnd }
-        }));
-    }
-
-    function restoreNavigationContext() {
-        const contextStr = sessionStorage.getItem('returnContext');
-        if (contextStr) {
-            try {
-                const context = JSON.parse(contextStr);
-                // Restore scroll position after a brief delay to let DOM render
-                if (context.scrollY) {
-                    setTimeout(() => window.scrollTo(0, context.scrollY), 100);
-                }
-                // Restore date range if time slider is available
-                if (context.dateRange && context.dateRange.start) {
-                    dateRangeStart = new Date(context.dateRange.start);
-                    dateRangeEnd = context.dateRange.end ? new Date(context.dateRange.end) : null;
-                }
-            } catch (e) {
-                console.error('Failed to restore navigation context:', e);
-            }
-            sessionStorage.removeItem('returnContext');
-        }
-    }
+    // Detail Panel Elements
+    const detailEmpty = document.getElementById('detail-empty');
+    const detailContent = document.getElementById('detail-content');
+    const detailLoading = document.getElementById('detail-loading');
+    const detailTitle = document.getElementById('detail-title');
+    const detailProject = document.getElementById('detail-project');
+    const detailCount = document.getElementById('detail-count');
+    const detailLink = document.getElementById('detail-link');
+    const detailDownload = document.getElementById('detail-download');
+    const detailMessages = document.getElementById('detail-messages');
 
     // Initialize
     function init() {
-        // Initialize theme from localStorage
         initTheme();
 
-        // Check URL for initial folder
+        // Check URL for initial folder and chat
         const urlParams = new URLSearchParams(window.location.search);
         const folderParam = urlParams.get('folder');
+        const chatParam = urlParams.get('chat');
+
         if (folderParam) {
             selectFolder(folderParam, false);
         }
 
-        // Restore navigation context from previous session
-        restoreNavigationContext();
+        if (chatParam) {
+            const [projectDir, chatId] = chatParam.split('/');
+            if (projectDir && chatId) {
+                selectChat(projectDir, chatId, false);
+            }
+        }
 
         // Set up search with debounce
         if (searchInput) {
@@ -76,30 +63,19 @@
 
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
-            // Ctrl/Cmd + K to focus search
             if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
                 e.preventDefault();
                 searchInput?.focus();
             }
         });
 
-        // Save navigation context when clicking chat links
-        document.querySelectorAll('.chat-link').forEach(link => {
-            link.addEventListener('click', saveNavigationContext);
-        });
-
-        // Connect TimeSlider range change to filtering
+        // Connect TimeSlider if available
         if (window.TimeSlider) {
             window.TimeSlider.onRangeChange(function(startDate, endDate) {
                 dateRangeStart = startDate;
                 dateRangeEnd = endDate;
                 filterChats();
             });
-
-            // Restore date range selection if available
-            if (dateRangeStart) {
-                window.TimeSlider.setSelection(dateRangeStart, dateRangeEnd);
-            }
         }
     }
 
@@ -108,7 +84,6 @@
         const savedTheme = localStorage.getItem('theme') || 'dark';
         applyTheme(savedTheme);
 
-        // Update toggle checkbox state
         const toggleInput = document.getElementById('theme-toggle-input');
         if (toggleInput) {
             toggleInput.checked = savedTheme === 'light';
@@ -118,7 +93,6 @@
     function applyTheme(theme) {
         document.documentElement.setAttribute('data-theme', theme);
 
-        // Update icon states
         const darkIcon = document.getElementById('dark-icon');
         const lightIcon = document.getElementById('light-icon');
 
@@ -133,11 +107,9 @@
         }
     }
 
-    // Toggle theme (called from HTML)
     window.toggleTheme = function() {
         const toggleInput = document.getElementById('theme-toggle-input');
         const newTheme = toggleInput?.checked ? 'light' : 'dark';
-
         applyTheme(newTheme);
         localStorage.setItem('theme', newTheme);
     };
@@ -159,7 +131,6 @@
     window.selectFolder = function(path, updateUrl = true) {
         currentFolder = path;
 
-        // Update active state in sidebar
         document.querySelectorAll('.folder-item').forEach(item => {
             item.classList.remove('active');
             if (item.dataset.path === path) {
@@ -167,22 +138,15 @@
             }
         });
 
-        // Update breadcrumb
-        updateBreadcrumb(path);
-
-        // Clear date range when folder changes
         dateRangeStart = null;
         dateRangeEnd = null;
 
-        // Update time slider to show only this folder's data
         if (window.TimeSlider) {
             window.TimeSlider.filterByFolder(path);
         }
 
-        // Filter chats
         filterChats();
 
-        // Update URL
         if (updateUrl) {
             const url = new URL(window.location);
             if (path) {
@@ -193,26 +157,10 @@
             window.history.pushState({}, '', url);
         }
 
-        // Close sidebar on mobile
         if (window.innerWidth <= 600) {
             closeSidebar();
         }
     };
-
-    // Update breadcrumb
-    function updateBreadcrumb(path) {
-        if (!breadcrumb) return;
-
-        if (!path) {
-            breadcrumb.innerHTML = '<span class="breadcrumb-item active" data-path="">All Conversations</span>';
-        } else {
-            breadcrumb.innerHTML = `
-                <span class="breadcrumb-item" data-path="" onclick="selectFolder('')">All Conversations</span>
-                <span class="breadcrumb-separator">›</span>
-                <span class="breadcrumb-item active" data-path="${path}">${path}</span>
-            `;
-        }
-    }
 
     // Toggle month group
     window.toggleMonth = function(monthKey) {
@@ -228,30 +176,26 @@
         filterChats();
     }
 
-    // Filter chats based on folder, search, and date range
+    // Filter chats
     function filterChats() {
-        const cards = document.querySelectorAll('.explorer-chat-card');
+        const cards = document.querySelectorAll('.chat-card');
         const monthGroups = document.querySelectorAll('.month-group');
         let visibleCards = 0;
         const monthCounts = {};
 
-        // First pass: filter cards
         cards.forEach(card => {
             const project = card.dataset.project || '';
             const title = (card.dataset.title || '').toLowerCase();
             const searchable = (card.dataset.searchable || '').toLowerCase();
             const cardDateStr = card.dataset.date;
 
-            // Check folder filter
             const matchesFolder = !currentFolder || project === currentFolder;
 
-            // Check search filter
             const matchesSearch = !searchTerm ||
                 title.includes(searchTerm) ||
                 searchable.includes(searchTerm) ||
                 project.toLowerCase().includes(searchTerm);
 
-            // Check date range filter
             let matchesDateRange = true;
             if (dateRangeStart || dateRangeEnd) {
                 const cardDate = new Date(cardDateStr);
@@ -269,7 +213,6 @@
                 card.style.display = '';
                 visibleCards++;
 
-                // Count for month group
                 const monthGroup = card.closest('.month-group');
                 if (monthGroup) {
                     const month = monthGroup.dataset.month;
@@ -280,7 +223,6 @@
             }
         });
 
-        // Second pass: update month groups visibility and counts
         monthGroups.forEach(group => {
             const month = group.dataset.month;
             const count = monthCounts[month] || 0;
@@ -296,15 +238,112 @@
             }
         });
 
-        // Update visible count
         if (visibleCount) {
             visibleCount.textContent = visibleCards;
         }
 
-        // Show/hide empty state
         if (emptyState) {
             emptyState.style.display = visibleCards === 0 ? '' : 'none';
         }
+    }
+
+    // Select and load chat
+    window.selectChat = async function(projectDir, chatId, updateUrl = true) {
+        selectedChatId = `${projectDir}/${chatId}`;
+
+        // Update active state in list
+        document.querySelectorAll('.chat-card').forEach(card => {
+            card.classList.remove('active');
+            if (card.dataset.projectDir === projectDir && card.dataset.chatId === chatId) {
+                card.classList.add('active');
+            }
+        });
+
+        // Show loading state
+        if (detailEmpty) detailEmpty.style.display = 'none';
+        if (detailContent) detailContent.style.display = 'none';
+        if (detailLoading) detailLoading.style.display = 'flex';
+
+        // Update URL
+        if (updateUrl) {
+            const url = new URL(window.location);
+            url.searchParams.set('chat', selectedChatId);
+            window.history.pushState({}, '', url);
+        }
+
+        try {
+            // Check cache first
+            let data;
+            if (chatCache[selectedChatId]) {
+                data = chatCache[selectedChatId];
+            } else {
+                const response = await fetch(`/api/chat/${projectDir}/${chatId}`);
+                if (!response.ok) throw new Error('Failed to load chat');
+                data = await response.json();
+                chatCache[selectedChatId] = data;
+            }
+
+            renderChatDetail(data);
+        } catch (error) {
+            console.error('Error loading chat:', error);
+            if (detailLoading) detailLoading.style.display = 'none';
+            if (detailEmpty) {
+                detailEmpty.style.display = 'flex';
+                detailEmpty.querySelector('.detail-empty-text').textContent = 'Failed to load chat';
+            }
+        }
+    };
+
+    // Render chat detail
+    function renderChatDetail(data) {
+        if (detailLoading) detailLoading.style.display = 'none';
+        if (detailContent) detailContent.style.display = 'flex';
+
+        // Update header
+        if (detailTitle) detailTitle.textContent = data.title || 'Chat';
+        if (detailProject) detailProject.textContent = data.projectName;
+        if (detailCount) detailCount.textContent = `${data.messageCount} messages`;
+        if (detailLink) detailLink.href = `/chat/${data.projectDir}/${data.chatId}`;
+        if (detailDownload) detailDownload.href = `/download/${data.projectDir}/${data.chatId}`;
+
+        // Render messages
+        if (detailMessages) {
+            detailMessages.innerHTML = data.messages.map((msg, idx) => `
+                <div class="detail-message" id="msg-${idx}">
+                    <div class="detail-message-role">
+                        <span class="role-badge ${msg.role}">${capitalize(msg.role)}</span>
+                        ${msg.timestamp ? `<span class="msg-time">${formatTime(msg.timestamp)}</span>` : ''}
+                    </div>
+                    <div class="detail-message-content">
+                        ${msg.htmlContent || escapeHtml(msg.content) || '<em>No content</em>'}
+                    </div>
+                </div>
+            `).join('');
+
+            // Scroll to top
+            detailMessages.scrollTop = 0;
+        }
+    }
+
+    // Helper functions
+    function capitalize(str) {
+        return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+    }
+
+    function formatTime(timestamp) {
+        try {
+            const date = new Date(timestamp);
+            return date.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+        } catch {
+            return '';
+        }
+    }
+
+    function escapeHtml(text) {
+        if (!text) return '';
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     // Toggle sidebar (mobile)
@@ -313,7 +352,6 @@
         sidebarOverlay?.classList.toggle('visible');
     };
 
-    // Close sidebar (mobile)
     function closeSidebar() {
         sidebar?.classList.remove('open');
         sidebarOverlay?.classList.remove('visible');

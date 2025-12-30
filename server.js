@@ -798,6 +798,97 @@ app.get('/chat/:project/:id', async (req, res) => {
   }
 });
 
+// API endpoint for chat data (JSON) - used by 3-panel layout
+app.get('/api/chat/:project/:id', async (req, res) => {
+  try {
+    const filename = `${req.params.id}.jsonl`;
+    const projectPath = path.join(CLAUDE_BASE_PATH, req.params.project);
+    const filePath = path.join(projectPath, filename);
+
+    const content = await fs.readFile(filePath, 'utf-8');
+    const lines = content.split('\n').filter(line => line.trim());
+
+    const messages = lines.map((line) => {
+      try {
+        const entry = JSON.parse(line);
+        if (entry.message) {
+          const msg = entry.message;
+
+          if (entry.type === 'user' && msg.role === 'user') {
+            return {
+              role: 'user',
+              content: msg.content || '',
+              htmlContent: msg.content ? marked(msg.content) : null,
+              timestamp: entry.timestamp
+            };
+          }
+
+          if (entry.type === 'assistant' && msg.role === 'assistant') {
+            let textContent = '';
+            if (Array.isArray(msg.content)) {
+              msg.content.forEach(item => {
+                if (item.type === 'text') {
+                  textContent += item.text + '\n';
+                } else if (item.type === 'tool_use') {
+                  textContent += `\n**Tool Call: ${item.name}**\n`;
+                  if (item.input) {
+                    if (item.name === 'Write' && item.input.file_path && item.input.content) {
+                      const fp = item.input.file_path;
+                      const ext = fp.split('.').pop()?.toLowerCase();
+                      const fn = fp.split('/').pop();
+                      textContent += `\n\`${fn}\`\n\n`;
+                      const langMap = { js: 'javascript', jsx: 'javascript', ts: 'typescript', tsx: 'typescript', py: 'python', html: 'html', css: 'css', json: 'json', yml: 'yaml', yaml: 'yaml', xml: 'xml', sql: 'sql', sh: 'bash', bash: 'bash' };
+                      if (ext !== 'md' && ext !== 'markdown') {
+                        textContent += `\`\`\`${langMap[ext] || 'text'}\n${item.input.content}\n\`\`\`\n`;
+                      } else {
+                        textContent += '---\n\n' + item.input.content + '\n\n---\n\n';
+                      }
+                    } else if (item.name === 'Read' && item.input.file_path) {
+                      textContent += `\n\`${item.input.file_path.split('/').pop()}\`\n`;
+                    } else {
+                      const inputStr = JSON.stringify(item.input, null, 2);
+                      if (inputStr && inputStr !== '{}' && inputStr !== 'null') {
+                        textContent += '```json\n' + inputStr + '\n```\n';
+                      }
+                    }
+                  }
+                }
+              });
+            } else if (typeof msg.content === 'string') {
+              textContent = msg.content;
+            }
+            return {
+              role: 'assistant',
+              content: textContent.trim(),
+              htmlContent: textContent ? marked(textContent.trim()) : null,
+              timestamp: entry.timestamp
+            };
+          }
+        }
+        return null;
+      } catch (e) {
+        return null;
+      }
+    }).filter(msg => msg !== null);
+
+    // Get first user message for title
+    const firstUserMsg = messages.find(m => m.role === 'user');
+    const title = firstUserMsg?.content?.split('\n')[0]?.substring(0, 100) || 'Chat';
+
+    res.json({
+      chatId: req.params.id,
+      projectDir: req.params.project,
+      projectName: extractProjectName(req.params.project),
+      title,
+      messageCount: messages.length,
+      messages
+    });
+  } catch (error) {
+    console.error('Error reading chat:', error);
+    res.status(404).json({ error: 'Chat not found' });
+  }
+});
+
 // Download chat as markdown
 app.get('/download/:project/:id', async (req, res) => {
   try {

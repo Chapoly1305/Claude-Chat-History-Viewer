@@ -4,17 +4,22 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Claude Chat History</title>
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <link rel="stylesheet" href="/css/claude-sidebar.css">
 </head>
 <body>
-    <div class="explorer-layout">
-        <!-- Sidebar -->
+    <div class="explorer-layout three-panel">
+        <!-- Panel 1: Sidebar (Folders) -->
         <aside class="explorer-sidebar" id="sidebar">
             <div class="sidebar-header">
                 <h2>Explorer</h2>
             </div>
             <div class="folder-tree" id="folder-tree">
-                <!-- All Conversations (root) -->
                 <div class="folder-item active expanded" data-path="">
                     <div class="folder-header" onclick="selectFolder('')">
                         <span class="folder-toggle expanded">▶</span>
@@ -37,7 +42,6 @@
                 </div>
             </div>
 
-            <!-- Theme Toggle -->
             <div class="theme-toggle">
                 <span class="theme-icon" id="dark-icon">🌙</span>
                 <label class="theme-switch">
@@ -51,128 +55,114 @@
         <!-- Mobile sidebar overlay -->
         <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
 
-        <!-- Content Panel -->
-        <main class="explorer-content">
-            <header class="content-header">
-                <h1>Claude Chat History <a href="/history-index.json" class="json-link" title="View history index as JSON">📊</a></h1>
-
-                <!-- Breadcrumb -->
-                <nav class="breadcrumb" id="breadcrumb">
-                    <span class="breadcrumb-item active" data-path="">All Conversations</span>
-                </nav>
-
-                <!-- Stats -->
-                <div class="content-stats">
-                    <div class="content-stat">
-                        <span class="content-stat-value"><%= stats.totalProjects %></span>
-                        <span>projects</span>
-                    </div>
-                    <div class="content-stat">
-                        <span class="content-stat-value" id="visible-count"><%= stats.totalConversations %></span>
-                        <span>conversations</span>
-                    </div>
-                    <div class="content-stat">
-                        <span class="content-stat-value"><%= stats.totalMessages %></span>
-                        <span>messages</span>
-                    </div>
+        <!-- Panel 2: Chat List -->
+        <section class="chat-list-panel" id="chat-list-panel">
+            <header class="list-header">
+                <div class="list-title">
+                    <span id="visible-count"><%= stats.totalConversations %></span> conversations
+                </div>
+                <div class="search-wrapper">
+                    <input type="text" class="search-input" id="search-input" placeholder="Search..." />
                 </div>
             </header>
 
-            <div class="content-body">
-                <!-- Search -->
-                <div class="content-search">
-                    <div class="search-wrapper">
-                        <input type="text"
-                               class="content-search-input"
-                               id="search-input"
-                               placeholder="Search conversations..." />
+            <!-- Time Slider Histogram -->
+            <div class="time-slider-container" id="time-slider">
+                <div class="time-slider-header">
+                    <span class="time-slider-title">Timeline</span>
+                    <div class="time-slider-controls">
+                        <button class="metric-toggle" id="metric-toggle" title="Toggle metric">
+                            <span class="metric-label" id="metric-label">Chats</span>
+                        </button>
+                        <button class="clear-range-btn" id="clear-range" title="Clear selection" style="display: none;">✕</button>
                     </div>
                 </div>
+                <div class="histogram-container">
+                    <div class="histogram-bars" id="histogram-bars"></div>
+                    <div class="histogram-selection" id="histogram-selection"></div>
+                </div>
+                <div class="time-slider-labels" id="time-labels"></div>
+                <div class="time-slider-range" id="range-display" style="display: none;"></div>
+            </div>
 
-                <!-- Time Slider Histogram -->
-                <div class="time-slider-container" id="time-slider">
-                    <div class="time-slider-header">
-                        <span class="time-slider-title">Activity Timeline</span>
-                        <div class="time-slider-controls">
-                            <button class="metric-toggle" id="metric-toggle" title="Toggle metric">
-                                <span class="metric-label" id="metric-label">Conversations</span>
-                            </button>
-                            <button class="clear-range-btn" id="clear-range" title="Clear date selection" style="display: none;">✕</button>
+            <div class="chat-list" id="chat-list">
+                <% monthGroups.forEach(group => { %>
+                    <div class="month-group" data-month="<%= group.key %>">
+                        <div class="month-header" onclick="toggleMonth('<%= group.key %>')">
+                            <span class="month-toggle">▼</span>
+                            <span class="month-label"><%= group.label %></span>
+                            <span class="month-count">(<%= group.chats.length %>)</span>
                         </div>
-                    </div>
-                    <div class="histogram-container">
-                        <div class="histogram-bars" id="histogram-bars"></div>
-                        <div class="histogram-selection" id="histogram-selection"></div>
-                    </div>
-                    <div class="time-slider-labels" id="time-labels"></div>
-                    <div class="time-slider-range" id="range-display" style="display: none;"></div>
-                </div>
-
-                <!-- Chat list grouped by month -->
-                <div class="chat-list" id="chat-list">
-                    <% monthGroups.forEach(group => { %>
-                        <div class="month-group" data-month="<%= group.key %>">
-                            <div class="month-header" onclick="toggleMonth('<%= group.key %>')">
-                                <span class="month-toggle">▼</span>
-                                <span class="month-label"><%= group.label %></span>
-                                <span class="month-count">(<%= group.chats.length %>)</span>
-                            </div>
-                            <div class="month-chats">
-                                <% group.chats.forEach(chat => { %>
-                                    <div class="explorer-chat-card"
-                                         data-project="<%= chat.projectName %>"
-                                         data-title="<%= typeof chat.firstMessage === 'string' ? chat.firstMessage : '' %>"
-                                         data-searchable="<%= typeof chat.searchableText === 'string' ? chat.searchableText.substring(0, 1000) : '' %>"
-                                         data-date="<%= chat.modifiedTime %>">
-                                        <a href="/chat/<%= chat.projectDir %>/<%= chat.id %>" class="chat-link">
-                                            <div class="chat-meta">
-                                                <span class="chat-date"><%= moment(chat.modifiedTime).format('MMM D, h:mm A') %></span>
-                                                <span class="chat-project"><%= chat.projectName %></span>
-                                            </div>
-                                            <div class="chat-title">
-                                                <% if (chat.enhancedSummary && chat.enhancedSummary.oneLine) { %>
-                                                    <%= chat.enhancedSummary.oneLine %>
-                                                <% } else { %>
-                                                    <% const title = typeof chat.firstMessage === 'string' ? chat.firstMessage : 'Untitled Chat'; %>
-                                                    <%= title.substring(0, 100) %><%= title.length > 100 ? '...' : '' %>
-                                                <% } %>
-                                            </div>
-                                            <div class="chat-summary-text">
-                                                <% if (chat.enhancedSummary && chat.enhancedSummary.paragraph) { %>
-                                                    <%= chat.enhancedSummary.paragraph.substring(0, 150) %><%= chat.enhancedSummary.paragraph.length > 150 ? '...' : '' %>
-                                                <% } else if (typeof chat.summary === 'string') { %>
-                                                    <%= chat.summary.replace(/<[^>]*>/g, '').substring(0, 150) %>
-                                                <% } %>
-                                            </div>
-                                        </a>
-                                        <div class="chat-footer">
-                                            <span class="message-count"><%= chat.messageCount %> messages</span>
-                                            <a href="/download/<%= chat.projectDir %>/<%= chat.id %>" class="download-link" title="Download as Markdown">📥</a>
-                                        </div>
+                        <div class="month-chats">
+                            <% group.chats.forEach(chat => { %>
+                                <div class="chat-card"
+                                     data-project="<%= chat.projectName %>"
+                                     data-project-dir="<%= chat.projectDir %>"
+                                     data-chat-id="<%= chat.id %>"
+                                     data-title="<%= typeof chat.firstMessage === 'string' ? chat.firstMessage : '' %>"
+                                     data-searchable="<%= typeof chat.searchableText === 'string' ? chat.searchableText.substring(0, 1000) : '' %>"
+                                     data-date="<%= chat.modifiedTime %>"
+                                     onclick="selectChat('<%= chat.projectDir %>', '<%= chat.id %>')">
+                                    <div class="chat-meta">
+                                        <span class="chat-date"><%= moment(chat.modifiedTime).format('MMM D, h:mm A') %></span>
+                                        <span class="chat-project"><%= chat.projectName %></span>
                                     </div>
-                                <% }) %>
-                            </div>
+                                    <div class="chat-title">
+                                        <% if (chat.enhancedSummary && chat.enhancedSummary.oneLine) { %>
+                                            <%= chat.enhancedSummary.oneLine %>
+                                        <% } else { %>
+                                            <% const title = typeof chat.firstMessage === 'string' ? chat.firstMessage : 'Untitled Chat'; %>
+                                            <%= title.substring(0, 80) %><%= title.length > 80 ? '...' : '' %>
+                                        <% } %>
+                                    </div>
+                                    <div class="chat-info">
+                                        <span class="message-count"><%= chat.messageCount %> msgs</span>
+                                    </div>
+                                </div>
+                            <% }) %>
                         </div>
-                    <% }) %>
-
-                    <!-- Empty state -->
-                    <div class="empty-state" id="empty-state" style="display: none;">
-                        <div class="empty-state-icon">🔍</div>
-                        <div class="empty-state-text">No conversations found</div>
-                        <div class="empty-state-hint">Try a different search term or folder</div>
                     </div>
+                <% }) %>
+
+                <div class="empty-state" id="empty-state" style="display: none;">
+                    <div class="empty-state-icon">🔍</div>
+                    <div class="empty-state-text">No conversations found</div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Panel 3: Chat Detail -->
+        <main class="chat-detail-panel" id="chat-detail-panel">
+            <div class="detail-empty" id="detail-empty">
+                <div class="detail-empty-icon">💬</div>
+                <div class="detail-empty-text">Select a conversation</div>
+                <div class="detail-empty-hint">Click on a chat from the list to view it here</div>
+            </div>
+
+            <div class="detail-content" id="detail-content" style="display: none;">
+                <header class="detail-header">
+                    <div class="detail-title" id="detail-title"></div>
+                    <div class="detail-meta">
+                        <span class="detail-project" id="detail-project"></span>
+                        <span class="detail-count" id="detail-count"></span>
+                        <a href="#" class="detail-link" id="detail-link" target="_blank" title="Open in new tab">↗</a>
+                        <a href="#" class="detail-download" id="detail-download" title="Download">📥</a>
+                    </div>
+                </header>
+                <div class="detail-messages" id="detail-messages"></div>
+            </div>
+
+            <div class="detail-loading" id="detail-loading" style="display: none;">
+                <div class="loading-spinner"></div>
+                <div>Loading...</div>
             </div>
         </main>
 
-        <!-- Mobile sidebar toggle button -->
-        <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">
-            📁
-        </button>
+        <!-- Mobile toggle -->
+        <button class="sidebar-toggle" id="sidebar-toggle" onclick="toggleSidebar()">📁</button>
     </div>
 
     <script>
-        // Pass conversation data to client for histogram
         window.conversationData = <%- JSON.stringify(allChats.map(c => ({
             date: c.modifiedTime,
             messages: c.messageCount,
