@@ -85,8 +85,14 @@ body {
 .claude-container {
     max-width: 900px;
     margin: 0 auto;
-    background-color: var(--bg-secondary);
+    background-color: var(--bg-primary);
     min-height: 100vh;
+}
+
+/* Hide empty code blocks */
+.message-content-container pre:empty,
+.message-content-container pre:has(code:empty) {
+    display: none;
 }
 
 /* Header */

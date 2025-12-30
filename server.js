@@ -631,17 +631,16 @@ app.get('/chat/:project/:id', async (req, res) => {
                 } else if (item.type === 'tool_use') {
                   textContent += `\n**Tool Call: ${item.name}**\n`;
                   if (item.input) {
-                    // Check if this is a Write or Read tool call with file content
-                    if ((item.name === 'Write' && item.input.file_path && item.input.content) ||
-                        (item.name === 'Read' && item.input.file_path)) {
+                    // Check if this is a Write tool call with file content
+                    if (item.name === 'Write' && item.input.file_path && item.input.content) {
                       const filePath = item.input.file_path;
                       const fileExt = filePath.split('.').pop()?.toLowerCase();
                       const content = item.input.content;
-                      
+
                       // Show filename prominently
                       const fileName = filePath.split('/').pop();
-                      textContent += `\n### ${fileName}\n\n`;
-                      
+                      textContent += `\n\`${fileName}\`\n\n`;
+
                       // Format content based on file extension
                       let language = '';
                       switch (fileExt) {
@@ -689,14 +688,21 @@ app.get('/chat/:project/:id', async (req, res) => {
                         default:
                           language = 'text';
                       }
-                      
+
                       // For non-markdown files, use syntax highlighting
                       if (fileExt !== 'md' && fileExt !== 'markdown') {
                         textContent += `\`\`\`${language}\n${content}\n\`\`\`\n`;
                       }
+                    } else if (item.name === 'Read' && item.input.file_path) {
+                      // Read tool - just show the filename being read
+                      const fileName = item.input.file_path.split('/').pop();
+                      textContent += `\n\`${fileName}\`\n`;
                     } else {
-                      // Regular tool input display
-                      textContent += '```json\n' + JSON.stringify(item.input, null, 2) + '\n```\n';
+                      // Regular tool input display - skip if empty or too simple
+                      const inputStr = JSON.stringify(item.input, null, 2);
+                      if (inputStr && inputStr !== '{}' && inputStr !== 'null') {
+                        textContent += '```json\n' + inputStr + '\n```\n';
+                      }
                     }
                   }
                 }
