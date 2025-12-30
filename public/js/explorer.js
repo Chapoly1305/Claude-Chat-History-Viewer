@@ -10,6 +10,7 @@
     let dateRangeEnd = null;
     let selectedChatId = null;
     let chatCache = {};
+    let ignoreWarmup = true;
 
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
@@ -77,6 +78,9 @@
                 filterChats();
             });
         }
+
+        // Apply initial filters (including warmup filter)
+        filterChats();
     }
 
     // Theme Management
@@ -176,6 +180,13 @@
         filterChats();
     }
 
+    // Toggle warmup filter
+    window.toggleWarmupFilter = function() {
+        const checkbox = document.getElementById('ignore-warmup');
+        ignoreWarmup = checkbox?.checked ?? true;
+        filterChats();
+    };
+
     // Filter chats
     function filterChats() {
         const cards = document.querySelectorAll('.chat-card');
@@ -196,6 +207,10 @@
                 searchable.includes(searchTerm) ||
                 project.toLowerCase().includes(searchTerm);
 
+            // Check warmup filter
+            const isWarmup = card.dataset.warmup === 'true';
+            const matchesWarmup = !ignoreWarmup || !isWarmup;
+
             let matchesDateRange = true;
             if (dateRangeStart || dateRangeEnd) {
                 const cardDate = new Date(cardDateStr);
@@ -209,7 +224,7 @@
                 }
             }
 
-            if (matchesFolder && matchesSearch && matchesDateRange) {
+            if (matchesFolder && matchesSearch && matchesDateRange && matchesWarmup) {
                 card.style.display = '';
                 visibleCards++;
 

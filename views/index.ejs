@@ -58,8 +58,14 @@
         <!-- Panel 2: Chat List -->
         <section class="chat-list-panel" id="chat-list-panel">
             <header class="list-header">
-                <div class="list-title">
-                    <span id="visible-count"><%= stats.totalConversations %></span> conversations
+                <div class="list-title-row">
+                    <div class="list-title">
+                        <span id="visible-count"><%= stats.totalConversations %></span> conversations
+                    </div>
+                    <label class="warmup-filter" title="Hide warmup conversations">
+                        <input type="checkbox" id="ignore-warmup" checked onchange="toggleWarmupFilter()">
+                        <span>Hide Warmup</span>
+                    </label>
                 </div>
                 <div class="search-wrapper">
                     <input type="text" class="search-input" id="search-input" placeholder="Search..." />
@@ -95,6 +101,7 @@
                         </div>
                         <div class="month-chats">
                             <% group.chats.forEach(chat => { %>
+                                <% const isWarmup = (typeof chat.firstMessage === 'string' && chat.firstMessage.trim().toLowerCase() === 'warmup'); %>
                                 <div class="chat-card"
                                      data-project="<%= chat.projectName %>"
                                      data-project-dir="<%= chat.projectDir %>"
@@ -102,6 +109,7 @@
                                      data-title="<%= typeof chat.firstMessage === 'string' ? chat.firstMessage : '' %>"
                                      data-searchable="<%= typeof chat.searchableText === 'string' ? chat.searchableText.substring(0, 1000) : '' %>"
                                      data-date="<%= chat.modifiedTime %>"
+                                     data-warmup="<%= isWarmup %>"
                                      onclick="selectChat('<%= chat.projectDir %>', '<%= chat.id %>')">
                                     <div class="chat-meta">
                                         <span class="chat-date"><%= moment(chat.modifiedTime).format('MMM D, h:mm A') %></span>

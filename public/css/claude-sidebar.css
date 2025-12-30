@@ -1540,10 +1540,36 @@ body {
     flex-shrink: 0;
 }
 
+.list-title-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
 .list-title {
     font-size: 13px;
     color: var(--text-muted);
-    margin-bottom: 10px;
+}
+
+.warmup-filter {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    user-select: none;
+}
+
+.warmup-filter input {
+    width: 14px;
+    height: 14px;
+    cursor: pointer;
+}
+
+.warmup-filter:hover {
+    color: var(--text-primary);
 }
 
 .chat-list-panel .search-wrapper {
