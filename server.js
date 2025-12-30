@@ -109,7 +109,8 @@ function generateChatSummary(userMessages, assistantMessages, firstUserMessage, 
 }
 
 // Claude conversation history base path
-const CLAUDE_BASE_PATH = path.join(process.env.HOME, '.claude/projects');
+// Supports CLAUDE_PROJECTS_PATH env var for Docker, falls back to default location
+const CLAUDE_BASE_PATH = process.env.CLAUDE_PROJECTS_PATH || path.join(process.env.HOME, '.claude/projects');
 
 // Serve static files
 app.use(express.static('public'));
@@ -162,7 +163,7 @@ async function updateHistoryIndex(chatsByProject) {
           .map(line => line.replace(/<[^>]*>/g, '').trim());
         
         // Extract just the first sentence from firstMessage
-        let firstSentence = chat.firstMessage || '';
+        let firstSentence = typeof chat.firstMessage === 'string' ? chat.firstMessage : '';
         const sentenceMatch = firstSentence.match(/^[^.!?]*[.!?]/);
         if (sentenceMatch) {
           firstSentence = sentenceMatch[0].trim();
