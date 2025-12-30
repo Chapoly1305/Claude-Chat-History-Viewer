@@ -17,29 +17,18 @@
         <!-- Panel 1: Sidebar (Folders) -->
         <aside class="explorer-sidebar" id="sidebar">
             <div class="sidebar-header">
-                <h2>Explorer</h2>
+                <h2>Explorer <span class="header-count"><%= folderTree.count %></span></h2>
             </div>
             <div class="folder-tree" id="folder-tree">
-                <div class="folder-item active expanded" data-path="">
-                    <div class="folder-header" onclick="selectFolder('')">
-                        <span class="folder-toggle expanded">▶</span>
-                        <span class="folder-icon">📁</span>
-                        <span class="folder-name"><%= folderTree.name %></span>
-                        <span class="folder-count"><%= folderTree.count %></span>
+                <% folderTree.children.forEach(project => { %>
+                    <div class="folder-item" data-path="<%= project.path %>">
+                        <div class="folder-header" onclick="selectFolder('<%= project.path %>')">
+                            <span class="folder-icon">📂</span>
+                            <span class="folder-name"><%= project.name %></span>
+                            <span class="folder-count"><%= project.count %></span>
+                        </div>
                     </div>
-                    <div class="folder-children">
-                        <% folderTree.children.forEach(project => { %>
-                            <div class="folder-item" data-path="<%= project.path %>">
-                                <div class="folder-header" onclick="selectFolder('<%= project.path %>')">
-                                    <span class="folder-toggle no-children">▶</span>
-                                    <span class="folder-icon">📂</span>
-                                    <span class="folder-name"><%= project.name %></span>
-                                    <span class="folder-count"><%= project.count %></span>
-                                </div>
-                            </div>
-                        <% }) %>
-                    </div>
-                </div>
+                <% }) %>
             </div>
 
             <div class="theme-toggle">
