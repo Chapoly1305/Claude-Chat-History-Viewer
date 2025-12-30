@@ -6,6 +6,8 @@
     // State
     let currentFolder = '';
     let searchTerm = '';
+    let dateRangeStart = null;
+    let dateRangeEnd = null;
 
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
@@ -15,6 +17,36 @@
     const breadcrumb = document.getElementById('breadcrumb');
     const visibleCount = document.getElementById('visible-count');
     const emptyState = document.getElementById('empty-state');
+
+    // Navigation context - save before leaving, restore on return
+    function saveNavigationContext() {
+        sessionStorage.setItem('returnContext', JSON.stringify({
+            folder: currentFolder,
+            scrollY: window.scrollY,
+            dateRange: { start: dateRangeStart, end: dateRangeEnd }
+        }));
+    }
+
+    function restoreNavigationContext() {
+        const contextStr = sessionStorage.getItem('returnContext');
+        if (contextStr) {
+            try {
+                const context = JSON.parse(contextStr);
+                // Restore scroll position after a brief delay to let DOM render
+                if (context.scrollY) {
+                    setTimeout(() => window.scrollTo(0, context.scrollY), 100);
+                }
+                // Restore date range if time slider is available
+                if (context.dateRange && context.dateRange.start) {
+                    dateRangeStart = new Date(context.dateRange.start);
+                    dateRangeEnd = context.dateRange.end ? new Date(context.dateRange.end) : null;
+                }
+            } catch (e) {
+                console.error('Failed to restore navigation context:', e);
+            }
+            sessionStorage.removeItem('returnContext');
+        }
+    }
 
     // Initialize
     function init() {
@@ -27,6 +59,9 @@
         if (folderParam) {
             selectFolder(folderParam, false);
         }
+
+        // Restore navigation context from previous session
+        restoreNavigationContext();
 
         // Set up search with debounce
         if (searchInput) {
@@ -47,6 +82,25 @@
                 searchInput?.focus();
             }
         });
+
+        // Save navigation context when clicking chat links
+        document.querySelectorAll('.chat-link').forEach(link => {
+            link.addEventListener('click', saveNavigationContext);
+        });
+
+        // Connect TimeSlider range change to filtering
+        if (window.TimeSlider) {
+            window.TimeSlider.onRangeChange(function(startDate, endDate) {
+                dateRangeStart = startDate;
+                dateRangeEnd = endDate;
+                filterChats();
+            });
+
+            // Restore date range selection if available
+            if (dateRangeStart) {
+                window.TimeSlider.setSelection(dateRangeStart, dateRangeEnd);
+            }
+        }
     }
 
     // Theme Management
@@ -116,6 +170,15 @@
         // Update breadcrumb
         updateBreadcrumb(path);
 
+        // Clear date range when folder changes
+        dateRangeStart = null;
+        dateRangeEnd = null;
+
+        // Update time slider to show only this folder's data
+        if (window.TimeSlider) {
+            window.TimeSlider.filterByFolder(path);
+        }
+
         // Filter chats
         filterChats();
 
@@ -165,7 +228,7 @@
         filterChats();
     }
 
-    // Filter chats based on folder and search
+    // Filter chats based on folder, search, and date range
     function filterChats() {
         const cards = document.querySelectorAll('.explorer-chat-card');
         const monthGroups = document.querySelectorAll('.month-group');
@@ -177,6 +240,7 @@
             const project = card.dataset.project || '';
             const title = (card.dataset.title || '').toLowerCase();
             const searchable = (card.dataset.searchable || '').toLowerCase();
+            const cardDateStr = card.dataset.date;
 
             // Check folder filter
             const matchesFolder = !currentFolder || project === currentFolder;
@@ -187,7 +251,21 @@
                 searchable.includes(searchTerm) ||
                 project.toLowerCase().includes(searchTerm);
 
-            if (matchesFolder && matchesSearch) {
+            // Check date range filter
+            let matchesDateRange = true;
+            if (dateRangeStart || dateRangeEnd) {
+                const cardDate = new Date(cardDateStr);
+                if (!isNaN(cardDate)) {
+                    if (dateRangeStart && cardDate < dateRangeStart) {
+                        matchesDateRange = false;
+                    }
+                    if (dateRangeEnd && cardDate > dateRangeEnd) {
+                        matchesDateRange = false;
+                    }
+                }
+            }
+
+            if (matchesFolder && matchesSearch && matchesDateRange) {
                 card.style.display = '';
                 visibleCards++;
 

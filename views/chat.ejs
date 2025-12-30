@@ -4,13 +4,20 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat <%= chatId.substring(0, 8) %> - <%= projectName %> - Claude History</title>
+    <script>
+        // Apply theme immediately to prevent flash of wrong colors
+        (function() {
+            const theme = localStorage.getItem('theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <link rel="stylesheet" href="/css/claude-chat.css">
 </head>
 <body>
     <div class="claude-container">
         <header class="claude-header">
             <div class="header-top">
-                <a href="/" class="back-link">← Back</a>
+                <a href="/" class="back-link" id="back-link">← Back</a>
                 <div class="header-center">
                     <span class="project-badge">📁 <%= projectName %></span>
                     <span class="chat-date">Chat started <%= moment(messages[0]?.timestamp || new Date()).format('MMM D, YYYY h:mm A') %> / <%= messageCount %> messages</span>
@@ -69,7 +76,28 @@
         </main>
     </div>
     <script src="/js/chat-search.js"></script>
-    
+    <script>
+        // Handle back navigation with context restoration
+        document.getElementById('back-link').addEventListener('click', function(e) {
+            e.preventDefault();
+            const contextStr = sessionStorage.getItem('returnContext');
+            if (contextStr) {
+                try {
+                    const context = JSON.parse(contextStr);
+                    const url = new URL('/', window.location.origin);
+                    if (context.folder) {
+                        url.searchParams.set('folder', context.folder);
+                    }
+                    window.location.href = url.toString();
+                } catch (err) {
+                    window.location.href = '/';
+                }
+            } else {
+                window.location.href = '/';
+            }
+        });
+    </script>
+
     <% if (searchTerm && searchCount > 0) { %>
     <script>
         // Search navigation functionality

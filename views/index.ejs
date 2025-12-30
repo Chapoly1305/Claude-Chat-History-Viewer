@@ -89,6 +89,25 @@
                     </div>
                 </div>
 
+                <!-- Time Slider Histogram -->
+                <div class="time-slider-container" id="time-slider">
+                    <div class="time-slider-header">
+                        <span class="time-slider-title">Activity Timeline</span>
+                        <div class="time-slider-controls">
+                            <button class="metric-toggle" id="metric-toggle" title="Toggle metric">
+                                <span class="metric-label" id="metric-label">Conversations</span>
+                            </button>
+                            <button class="clear-range-btn" id="clear-range" title="Clear date selection" style="display: none;">✕</button>
+                        </div>
+                    </div>
+                    <div class="histogram-container">
+                        <div class="histogram-bars" id="histogram-bars"></div>
+                        <div class="histogram-selection" id="histogram-selection"></div>
+                    </div>
+                    <div class="time-slider-labels" id="time-labels"></div>
+                    <div class="time-slider-range" id="range-display" style="display: none;"></div>
+                </div>
+
                 <!-- Chat list grouped by month -->
                 <div class="chat-list" id="chat-list">
                     <% monthGroups.forEach(group => { %>
@@ -152,6 +171,15 @@
         </button>
     </div>
 
+    <script>
+        // Pass conversation data to client for histogram
+        window.conversationData = <%- JSON.stringify(allChats.map(c => ({
+            date: c.modifiedTime,
+            messages: c.messageCount,
+            project: c.projectName
+        }))) %>;
+    </script>
+    <script src="/js/time-slider.js"></script>
     <script src="/js/explorer.js"></script>
 </body>
 </html>
