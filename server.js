@@ -112,6 +112,78 @@ function generateChatSummary(userMessages, assistantMessages, firstUserMessage, 
 // Supports CLAUDE_PROJECTS_PATH env var for Docker, falls back to default location
 const CLAUDE_BASE_PATH = process.env.CLAUDE_PROJECTS_PATH || path.join(process.env.HOME, '.claude/projects');
 
+// Build folder tree from projects for explorer sidebar
+function buildFolderTree(chatsByProject) {
+  const tree = {
+    name: 'All Conversations',
+    path: '',
+    count: 0,
+    children: []
+  };
+
+  // Count total and build flat project list first
+  const projects = [];
+  Object.entries(chatsByProject).forEach(([projectName, chats]) => {
+    tree.count += chats.length;
+    projects.push({
+      name: projectName,
+      path: projectName,
+      count: chats.length,
+      children: []
+    });
+  });
+
+  // Sort projects alphabetically
+  projects.sort((a, b) => a.name.localeCompare(b.name));
+  tree.children = projects;
+
+  return tree;
+}
+
+// Group chats by month/year for display
+function groupChatsByMonth(allChats) {
+  const groups = {};
+
+  allChats.forEach(chat => {
+    const date = chat.modifiedTime || new Date();
+    const monthKey = moment(date).format('YYYY-MM');
+    const monthLabel = moment(date).format('MMMM YYYY');
+
+    if (!groups[monthKey]) {
+      groups[monthKey] = {
+        key: monthKey,
+        label: monthLabel,
+        chats: []
+      };
+    }
+    groups[monthKey].chats.push(chat);
+  });
+
+  // Sort groups by date (newest first) and chats within each group
+  const sortedGroups = Object.values(groups)
+    .sort((a, b) => b.key.localeCompare(a.key));
+
+  sortedGroups.forEach(group => {
+    group.chats.sort((a, b) => new Date(b.modifiedTime) - new Date(a.modifiedTime));
+  });
+
+  return sortedGroups;
+}
+
+// Get all chats as flat array with project info
+function getAllChatsFlat(chatsByProject) {
+  const allChats = [];
+  Object.entries(chatsByProject).forEach(([projectName, chats]) => {
+    chats.forEach(chat => {
+      allChats.push({
+        ...chat,
+        projectName
+      });
+    });
+  });
+  return allChats;
+}
+
 // Serve static files
 app.use(express.static('public'));
 app.use('/js', express.static(path.join(__dirname, 'public/js')));
@@ -491,7 +563,12 @@ app.get('/', async (req, res) => {
       console.log('Could not load enhanced summaries:', e);
     }
     
-    res.render('index', { 
+    // Build explorer data structures
+    const folderTree = buildFolderTree(chatsByProject);
+    const allChats = getAllChatsFlat(chatsByProject);
+    const monthGroups = groupChatsByMonth(allChats);
+
+    res.render('index', {
       chatsByProject,
       sortedProjects,
       moment,
@@ -500,7 +577,10 @@ app.get('/', async (req, res) => {
         totalMessages,
         totalProjects: sortedProjects.length
       },
-      analysisResults
+      analysisResults,
+      folderTree,
+      monthGroups,
+      allChats
     });
   } catch (error) {
     console.error('Error reading chat histories:', error);
