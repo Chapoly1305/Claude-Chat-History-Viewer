@@ -18,6 +18,9 @@
 
     // Initialize
     function init() {
+        // Initialize theme from localStorage
+        initTheme();
+
         // Check URL for initial folder
         const urlParams = new URLSearchParams(window.location.search);
         const folderParam = urlParams.get('folder');
@@ -45,6 +48,45 @@
             }
         });
     }
+
+    // Theme Management
+    function initTheme() {
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        applyTheme(savedTheme);
+
+        // Update toggle checkbox state
+        const toggleInput = document.getElementById('theme-toggle-input');
+        if (toggleInput) {
+            toggleInput.checked = savedTheme === 'light';
+        }
+    }
+
+    function applyTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+
+        // Update icon states
+        const darkIcon = document.getElementById('dark-icon');
+        const lightIcon = document.getElementById('light-icon');
+
+        if (darkIcon && lightIcon) {
+            if (theme === 'light') {
+                darkIcon.classList.remove('active');
+                lightIcon.classList.add('active');
+            } else {
+                darkIcon.classList.add('active');
+                lightIcon.classList.remove('active');
+            }
+        }
+    }
+
+    // Toggle theme (called from HTML)
+    window.toggleTheme = function() {
+        const toggleInput = document.getElementById('theme-toggle-input');
+        const newTheme = toggleInput?.checked ? 'light' : 'dark';
+
+        applyTheme(newTheme);
+        localStorage.setItem('theme', newTheme);
+    };
 
     // Debounce helper
     function debounce(func, wait) {
