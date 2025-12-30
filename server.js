@@ -741,7 +741,8 @@ app.get('/chat/:project/:id', async (req, res) => {
         console.error(`Error parsing line ${index + 1}:`, e);
         return null;
       }
-    }).filter(msg => msg !== null); // Remove null entries
+    }).filter(msg => msg !== null)
+      .filter(msg => !(msg.role === 'assistant' && (!msg.content || msg.content.trim() === ''))); // Remove null and empty assistant messages
     
     // Store original messages before highlighting for title extraction
     const originalMessages = messages.map(msg => ({ ...msg }));
@@ -869,7 +870,8 @@ app.get('/api/chat/:project/:id', async (req, res) => {
       } catch (e) {
         return null;
       }
-    }).filter(msg => msg !== null);
+    }).filter(msg => msg !== null)
+      .filter(msg => !(msg.role === 'assistant' && (!msg.content || msg.content.trim() === '')));
 
     // Get first user message for title
     const firstUserMsg = messages.find(m => m.role === 'user');

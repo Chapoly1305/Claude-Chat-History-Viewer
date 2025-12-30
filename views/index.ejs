@@ -101,7 +101,13 @@
                         </div>
                         <div class="month-chats">
                             <% group.chats.forEach(chat => { %>
-                                <% const isWarmup = (typeof chat.firstMessage === 'string' && chat.firstMessage.trim().toLowerCase() === 'warmup'); %>
+                                <%
+                                const firstMsg = typeof chat.firstMessage === 'string' ? chat.firstMessage.trim().toLowerCase() : '';
+                                const summaryText = (chat.enhancedSummary?.oneLine || '').toLowerCase();
+                                const isWarmup = (chat.messageCount === 0) ||
+                                                 (firstMsg === 'warmup') ||
+                                                 summaryText.includes('0-message conversation');
+                                %>
                                 <div class="chat-card"
                                      data-project="<%= chat.projectName %>"
                                      data-project-dir="<%= chat.projectDir %>"

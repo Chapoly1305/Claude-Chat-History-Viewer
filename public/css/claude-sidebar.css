@@ -1854,6 +1854,29 @@ body {
     padding: 0;
 }
 
+/* Tone down markdown headings in detail panel */
+.detail-message-content h1 {
+    font-size: 18px;
+    margin: 16px 0 8px 0;
+}
+
+.detail-message-content h2 {
+    font-size: 16px;
+    margin: 14px 0 6px 0;
+}
+
+.detail-message-content h3 {
+    font-size: 15px;
+    margin: 12px 0 6px 0;
+}
+
+.detail-message-content h4,
+.detail-message-content h5,
+.detail-message-content h6 {
+    font-size: 14px;
+    margin: 10px 0 4px 0;
+}
+
 /* Loading State */
 .detail-loading {
     flex: 1;
