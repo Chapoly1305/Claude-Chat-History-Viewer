@@ -1136,7 +1136,7 @@ app.get('/analyze-chats', async (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`Claude Chat Viewer running at http://localhost:${PORT}`);
+app.listen(PORT, '127.0.0.1', () => {
+  console.log(`Claude Chat Viewer running at http://127.0.0.1:${PORT}`);
   console.log(`Reading chats from: ${CLAUDE_BASE_PATH}`);
 });
