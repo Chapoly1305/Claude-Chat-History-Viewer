@@ -19,6 +19,9 @@
             <div class="sidebar-header">
                 <h2>Explorer <span class="header-count"><%= folderTree.count %></span></h2>
             </div>
+            <div class="sidebar-search-wrapper">
+                <input type="text" class="search-input" id="search-input" placeholder="Search all conversations..." />
+            </div>
             <div class="folder-tree" id="folder-tree">
                 <% folderTree.children.forEach(project => { %>
                     <div class="folder-item" data-path="<%= project.path %>">
@@ -55,9 +58,6 @@
                         <input type="checkbox" id="ignore-warmup" checked onchange="toggleWarmupFilter()">
                         <span>Hide Warmup</span>
                     </label>
-                </div>
-                <div class="search-wrapper">
-                    <input type="text" class="search-input" id="search-input" placeholder="Search..." />
                 </div>
             </header>
 

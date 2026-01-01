@@ -803,6 +803,45 @@ body {
     margin-left: 6px;
 }
 
+/* Sidebar Search */
+.sidebar-search-wrapper {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    flex-shrink: 0;
+    position: relative;
+}
+
+.sidebar-search-wrapper::before {
+    content: "🔍";
+    position: absolute;
+    left: 28px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    opacity: 0.5;
+    pointer-events: none;
+}
+
+.sidebar-search-wrapper .search-input {
+    width: 100%;
+    background-color: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    padding: 8px 12px 8px 32px;
+    font-size: 13px;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.sidebar-search-wrapper .search-input:focus {
+    border-color: var(--accent-color);
+}
+
+.sidebar-search-wrapper .search-input::placeholder {
+    color: var(--text-dimmer);
+}
+
 /* Folder Tree */
 .folder-tree {
     flex: 1;
@@ -813,6 +852,7 @@ body {
 .folder-item {
     cursor: pointer;
     user-select: none;
+    transition: opacity 0.15s;
 }
 
 .folder-header {
@@ -1554,7 +1594,6 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
 }
 
 .list-title {
@@ -1971,5 +2010,14 @@ body {
 
     .detail-message {
         padding: 12px 16px;
+    }
+
+    .sidebar-search-wrapper {
+        padding: 10px 12px;
+    }
+
+    .sidebar-search-wrapper .search-input {
+        font-size: 14px;
+        padding: 10px 12px 10px 36px;
     }
 }

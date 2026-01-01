@@ -11,6 +11,7 @@
     let selectedChatId = null;
     let chatCache = {};
     let ignoreWarmup = true;
+    let folderMatchCounts = {}; // Track folder matches during search
 
     // DOM Elements
     const sidebar = document.getElementById('sidebar');
@@ -194,12 +195,18 @@
         let visibleCards = 0;
         const monthCounts = {};
 
+        // Reset folder match counts when searching
+        if (searchTerm) {
+            folderMatchCounts = {};
+        }
+
         cards.forEach(card => {
             const project = card.dataset.project || '';
             const title = (card.dataset.title || '').toLowerCase();
             const searchable = (card.dataset.searchable || '').toLowerCase();
             const cardDateStr = card.dataset.date;
 
+            // Always respect folder selection (combines with search if both active)
             const matchesFolder = !currentFolder || project === currentFolder;
 
             const matchesSearch = !searchTerm ||
@@ -222,6 +229,12 @@
                         matchesDateRange = false;
                     }
                 }
+            }
+
+            // Track folder matches when searching (before folder filter)
+            // This ensures all folders with search matches are shown in the tree
+            if (searchTerm && matchesSearch && matchesDateRange && matchesWarmup) {
+                folderMatchCounts[project] = (folderMatchCounts[project] || 0) + 1;
             }
 
             if (matchesFolder && matchesSearch && matchesDateRange && matchesWarmup) {
@@ -259,6 +272,45 @@
 
         if (emptyState) {
             emptyState.style.display = visibleCards === 0 ? '' : 'none';
+        }
+
+        // Update folder tree based on search results
+        updateFolderTree();
+    }
+
+    // Update folder tree visibility and counts based on search
+    function updateFolderTree() {
+        const folderItems = document.querySelectorAll('.folder-item');
+
+        if (searchTerm) {
+            // When searching, only show folders with matches
+            folderItems.forEach(item => {
+                const path = item.dataset.path;
+                const matchCount = folderMatchCounts[path] || 0;
+                const countEl = item.querySelector('.folder-count');
+
+                if (matchCount > 0) {
+                    item.style.display = '';
+                    if (countEl) {
+                        // Store original count if not already stored
+                        if (!countEl.dataset.originalCount) {
+                            countEl.dataset.originalCount = countEl.textContent;
+                        }
+                        countEl.textContent = matchCount;
+                    }
+                } else {
+                    item.style.display = 'none';
+                }
+            });
+        } else {
+            // When not searching, show all folders and restore original counts
+            folderItems.forEach(item => {
+                item.style.display = '';
+                const countEl = item.querySelector('.folder-count');
+                if (countEl && countEl.dataset.originalCount) {
+                    countEl.textContent = countEl.dataset.originalCount;
+                }
+            });
         }
     }
 
