@@ -4,6 +4,11 @@ const path = require('path');
 const { marked } = require('marked');
 const moment = require('moment');
 
+marked.setOptions({
+  mangle: false,
+  headerIds: false
+});
+
 const app = express();
 const PORT = 3101;
 
@@ -235,7 +240,12 @@ async function updateHistoryIndex(chatsByProject) {
           .map(line => line.replace(/<[^>]*>/g, '').trim());
         
         // Extract just the first sentence from firstMessage
-        let firstSentence = typeof chat.firstMessage === 'string' ? chat.firstMessage : '';
+        let firstSentence = chat.firstMessage;
+        if (Array.isArray(firstSentence)) {
+          firstSentence = firstSentence.map(b => b.text || '').join(' ').trim();
+        } else if (typeof firstSentence !== 'string') {
+          firstSentence = '';
+        }
         const sentenceMatch = firstSentence.match(/^[^.!?]*[.!?]/);
         if (sentenceMatch) {
           firstSentence = sentenceMatch[0].trim();
@@ -358,10 +368,20 @@ async function runAnalysis() {
         }
         
       } catch (error) {
-        console.error(`Error analyzing chat ${chat.id}:`, error);
+        if (error.code === 'ENOENT') {
+          // File doesn't exist - remove stale entry from index
+          const staleIndex = historyIndex.findIndex(t => t.id === chat.id);
+          if (staleIndex !== -1) {
+            console.log(`Removing stale chat entry: ${chat.id} (file not found)`);
+            historyIndex.splice(staleIndex, 1);
+            results.staleEntriesRemoved = (results.staleEntriesRemoved || 0) + 1;
+          }
+        } else {
+          console.error(`Error analyzing chat ${chat.id}:`, error);
+        }
       }
     }
-    
+
     // Save updated index
     await fs.writeFile(HISTORY_INDEX_PATH, JSON.stringify(historyIndex, null, 2));
     
@@ -411,14 +431,25 @@ app.get('/', async (req, res) => {
         let summary = '';
         const userMessages = [];
         const assistantMessages = [];
+        let actualMessageCount = 0; // Only count real user/assistant messages
         
         // Extract all messages for summarization
+        let chatSummary = '';
         for (const line of lines) {
           try {
             const entry = JSON.parse(line);
+            // Capture summary from summary entries
+            if (entry.type === 'summary' && entry.summary) {
+              chatSummary = entry.summary;
+            }
             if (entry.type === 'user' && entry.message && entry.message.role === 'user') {
-              const content = entry.message.content || '';
+              let content = entry.message.content || '';
+              // Normalize content if it's an array of content blocks
+              if (Array.isArray(content)) {
+                content = content.map(b => b.text || '').join(' ').trim();
+              }
               userMessages.push(content);
+              actualMessageCount++;
               if (!firstUserMessage) {
                 firstUserMessage = content;
               }
@@ -450,6 +481,7 @@ app.get('/', async (req, res) => {
               }
               if (textContent.trim()) {
                 assistantMessages.push(textContent.trim());
+                actualMessageCount++;
               }
             } else if (entry.type === 'tool_result' || entry.type === 'system') {
               // Also capture tool results and system messages
@@ -497,15 +529,15 @@ app.get('/', async (req, res) => {
           modifiedTime: stats.mtime,
           createdTime: stats.birthtime,
           size: stats.size,
-          firstMessage: firstUserMessage || 'No preview available',
+          firstMessage: firstUserMessage || chatSummary || 'No preview available',
           summary: summaryResult.summary || 'No summary available',
-          messageCount: content.split('\n').filter(line => line.trim()).length,
+          messageCount: actualMessageCount,
           searchableText: searchableText, // Add full text for searching
           lastMessageTimestamp: lastMessageTimestamp
         };
         })
       );
-      
+
       if (projectChats.length > 0) {
         chatsByProject[projectName] = projectChats;
       }
@@ -743,7 +775,7 @@ app.get('/chat/:project/:id', async (req, res) => {
       }
     }).filter(msg => msg !== null)
       .filter(msg => !(msg.role === 'assistant' && (!msg.content || msg.content.trim() === ''))); // Remove null and empty assistant messages
-    
+
     // Store original messages before highlighting for title extraction
     const originalMessages = messages.map(msg => ({ ...msg }));
     
@@ -1030,6 +1062,13 @@ async function getFullConversation(projectDir, chatId) {
 
 // Helper function to analyze a single chat
 async function analyzeChat(messages, firstMessage) {
+  // Normalize firstMessage to string (may be array of content blocks)
+  if (Array.isArray(firstMessage)) {
+    firstMessage = firstMessage.map(b => b.text || '').join(' ');
+  } else if (typeof firstMessage !== 'string') {
+    firstMessage = String(firstMessage || '');
+  }
+
   // Create a conversation summary for analysis
   let conversationText = '';
   messages.forEach(msg => {
